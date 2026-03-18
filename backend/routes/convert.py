@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import io
 
 from backend.database import get_db
-from backend.models.image_model import ImageRecord
+from backend.models import ImageRecord
 from backend.services.image_converter import ImageConverter
 from backend.storage.r2_storage import r2_storage
 from backend.config import settings
@@ -18,6 +18,70 @@ router = APIRouter(prefix="/api", tags=["conversion"])
 
 # In-memory storage for files when R2 is not configured
 local_storage = {}
+
+
+async def _upload_single_image(file: UploadFile, db: Session):
+    # Validate file
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    # Check file extension
+    if not ImageConverter.validate_input_file(file.filename):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file format. Allowed: {', '.join(ImageConverter.ALLOWED_INPUT_FORMATS)}",
+        )
+
+    # Read file content
+    file_content = await file.read()
+
+    # Check file size
+    if len(file_content) > settings.MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size: {settings.MAX_FILE_SIZE / 1024 / 1024:.1f}MB",
+        )
+
+    # Get file format
+    file_ext = ImageConverter.get_file_extension(file.filename)
+    file_format = ImageConverter.get_format_from_extension(file_ext)
+
+    # Create database record
+    image_record = ImageRecord(
+        original_name=file.filename,
+        original_format=file_format,
+        file_size=str(len(file_content)),
+        status="uploaded",
+    )
+    db.add(image_record)
+    db.commit()
+    db.refresh(image_record)
+
+    # Store file locally or upload to R2
+    original_url = None
+    if r2_storage.is_configured():
+        original_url = r2_storage.upload_file(
+            file_content,
+            file.filename,
+            content_type=f"image/{file_format.lower()}",
+        )
+    else:
+        # Store in memory for development
+        local_storage[f"original_{image_record.id}"] = file_content
+        original_url = f"local://original_{image_record.id}"
+
+    if original_url:
+        image_record.original_url = original_url
+        db.commit()
+
+    return {
+        "id": image_record.id,
+        "message": "Upload successful",
+        "original_name": file.filename,
+        "format": file_format,
+        "size": len(file_content),
+        "url": original_url,
+    }
 
 
 @router.post("/upload")
@@ -32,66 +96,46 @@ async def upload_image(
     Returns:
         JSON with upload status and image ID
     """
-    # Validate file
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided")
-    
-    # Check file extension
-    if not ImageConverter.validate_input_file(file.filename):
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Invalid file format. Allowed: {', '.join(ImageConverter.ALLOWED_INPUT_FORMATS)}"
-        )
-    
-    # Read file content
-    file_content = await file.read()
-    
-    # Check file size
-    if len(file_content) > settings.MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"File too large. Maximum size: {settings.MAX_FILE_SIZE / 1024 / 1024:.1f}MB"
-        )
-    
-    # Get file format
-    file_ext = ImageConverter.get_file_extension(file.filename)
-    file_format = ImageConverter.get_format_from_extension(file_ext)
-    
-    # Create database record
-    image_record = ImageRecord(
-        original_name=file.filename,
-        original_format=file_format,
-        file_size=str(len(file_content)),
-        status="uploaded"
-    )
-    db.add(image_record)
-    db.commit()
-    db.refresh(image_record)
-    
-    # Store file locally or upload to R2
-    original_url = None
-    if r2_storage.is_configured():
-        original_url = r2_storage.upload_file(
-            file_content,
-            file.filename,
-            content_type=f"image/{file_format.lower()}"
-        )
-    else:
-        # Store in memory for development
-        local_storage[f"original_{image_record.id}"] = file_content
-        original_url = f"local://original_{image_record.id}"
-    
-    if original_url:
-        image_record.original_url = original_url
-        db.commit()
-    
+    return await _upload_single_image(file, db)
+
+
+@router.post("/upload/bulk")
+async def upload_images_bulk(
+    background_tasks: BackgroundTasks,
+    files: list[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload multiple image files.
+
+    Returns:
+        JSON with uploaded items and per-file errors (if any)
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    items = []
+    errors = []
+
+    for index, file in enumerate(files):
+        try:
+            item = await _upload_single_image(file, db)
+            item["index"] = index
+            items.append(item)
+        except HTTPException as e:
+            errors.append(
+                {
+                    "index": index,
+                    "filename": file.filename,
+                    "detail": e.detail,
+                }
+            )
+
     return {
-        "id": image_record.id,
-        "message": "Upload successful",
-        "original_name": file.filename,
-        "format": file_format,
-        "size": len(file_content),
-        "url": original_url
+        "count": len(items),
+        "items": items,
+        "error_count": len(errors),
+        "errors": errors,
     }
 
 

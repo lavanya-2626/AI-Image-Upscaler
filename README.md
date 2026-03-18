@@ -1,94 +1,153 @@
-# 🖼️ Image Morph
+# Image Morph
 
-A web-based image conversion platform that allows users to upload images and convert them into optimized formats like WebP and SVG.
+A modern, all-in-one web-based image processing platform powered by FastAPI and React. Transform your images with AI-powered upscaling, intelligent format conversion, and batch processing capabilities.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)
+![React](https://img.shields.io/badge/React-18-61DAFB.svg)
 
-## ✨ Features
+## Features
 
-- **Fast Image Conversion**: Convert images quickly using Pillow and CairoSVG
-- **Multiple Formats**: Support for WebP, SVG, PNG, and JPEG output
-- **Web Optimization**: Reduce image size for better web performance
-- **Cloud Storage**: Optional Cloudflare R2 integration for file storage
-- **REST API**: Developer-friendly API for integration
-- **Drag & Drop**: Easy file upload with drag and drop support
-- **Conversion History**: Track and manage previous conversions
-- **File Size Comparison**: See how much space you're saving
+### Core Features
 
-## 🛠️ Technology Stack
+#### Image Format Conversion
+- **Smart Format Conversion**: Convert between WebP, PNG, JPG, SVG formats
+- **Quality Optimization**: Adjustable quality settings for lossy formats
+- **Size Reduction**: Automatic optimization to reduce file sizes
+- **Bulk Conversion**: Process multiple images simultaneously
+
+#### AI-Powered Upscaling (Optional)
+- **RealESRGAN Models**: State-of-the-art deep learning for image enhancement
+- **Multiple Scales**: Choose between 2x and 4x upscaling
+- **Single & Bulk Processing**: Upscale one image or process up to 20 images at once
+- **Queue Processing**: Celery-based background processing for handling multiple jobs
+- **Before/After Comparison**: Interactive slider to compare original and upscaled images
+
+### Frontend Features (React)
+- **Drag & Drop Upload**: Intuitive file upload with drag-and-drop support
+- **Image Preview**: Preview images before processing
+- **Real-time Progress**: Live progress tracking with status updates
+- **Responsive Design**: Works on desktop and mobile devices
+- **Modern Stack**: React 18 + Vite + Tailwind CSS
+
+### Backend Features (FastAPI)
+- **Modular Services**: Separate services for conversion and upscaling
+- **Job Queue**: Celery + Redis for reliable background processing
+- **Unified Database**: Single SQLite database for all operations
+- **REST API**: Full-featured API with Swagger documentation
+- **Cloud Ready**: Optional Cloudflare R2 storage integration
+
+## Technology Stack
 
 ### Backend
 - **Python 3.11+**
 - **FastAPI** - Modern, fast web framework
-- **Pillow** - Image processing library
-- **CairoSVG** - SVG conversion
-- **SQLAlchemy** - Database ORM
-- **Boto3** - AWS S3/R2 SDK
+- **SQLAlchemy** - Database ORM with unified models
+- **Celery** - Distributed task queue
+- **Redis** - Message broker for Celery
+- **Pillow** - Image processing
+- **RealESRGAN** - AI upscaling models (PyTorch, optional)
 
 ### Frontend
-- **HTML5**
-- **CSS3** (with CSS Variables)
-- **Vanilla JavaScript**
-- **Responsive Design**
+- **React 18** - UI library
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **react-dropzone** - File upload
+- **react-compare-slider** - Before/after comparison
+- **Axios** - HTTP client
 
 ### Storage
+- **SQLite** - Local database (image_morph.db)
 - **Cloudflare R2** (optional) - Cloud object storage
-- **SQLite** - Local database for metadata
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-image_morph/
+image-morph/
 │
-├── backend/
-│   ├── app.py                 # FastAPI application entry point
-│   ├── config.py              # Configuration settings
-│   ├── routes/
-│   │   └── convert.py         # API routes for conversion
-│   ├── services/
-│   │   └── image_converter.py # Image processing logic
-│   ├── storage/
-│   │   └── r2_storage.py      # Cloudflare R2 integration
-│   ├── models/
-│   │   └── image_model.py     # Database models
-│   └── database/
-│       └── __init__.py        # Database configuration
+├── backend/                   # FastAPI backend
+│   ├── app.py                # Main application entry
+│   ├── config.py             # Configuration settings
+│   ├── celery_app.py         # Celery configuration
+│   ├── database/             # Database setup
+│   │   └── __init__.py
+│   ├── routes/               # API routes
+│   │   ├── convert.py        # Image conversion endpoints
+│   │   └── upscale.py        # AI upscaling endpoints
+│   ├── services/             # Business logic
+│   │   ├── image_converter.py # Image format conversion
+│   │   ├── upscaler.py       # RealESRGAN integration
+│   │   └── upscaler_simple.py # Basic upscaling fallback
+│   ├── tasks/                # Celery background tasks
+│   │   └── upscale_tasks.py
+│   ├── models/               # Database models
+│   │   └── image_model.py    # Unified models (ImageRecord, UpscaleJob, ProcessedImage)
+│   ├── schemas/              # Pydantic schemas
+│   │   └── upscale.py
+│   └── storage/              # Storage utilities
+│       └── r2_storage.py     # Cloudflare R2 integration
 │
-├── frontend/
-│   ├── index.html             # Main HTML page
-│   ├── style.css              # Stylesheet
-│   └── app.js                 # Frontend JavaScript
+├── frontend/                  # React frontend
+│   ├── src/
+│   │   ├── App.jsx           # Main app component
+│   │   ├── components/       # React components
+│   │   │   ├── Header.jsx
+│   │   │   ├── UploadZone.jsx
+│   │   │   ├── ScaleSelector.jsx
+│   │   │   ├── ProgressBar.jsx
+│   │   │   ├── ImageComparison.jsx
+│   │   │   ├── BulkResults.jsx
+│   │   │   └── JobHistory.jsx
+│   │   ├── hooks/            # Custom React hooks
+│   │   │   ├── useUpscale.js
+│   │   │   └── useJobHistory.js
+│   │   └── services/
+│   │       └── api.js        # API client
+│   ├── package.json
+│   └── vite.config.js
 │
-├── docker/
-│   ├── Dockerfile             # Docker image definition
-│   ├── docker-compose.yml     # Docker Compose configuration
-│   └── nginx.conf             # Nginx configuration
+├── docker/                    # Docker configuration
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── nginx.conf
 │
+├── ai/                        # AI coding rules and guidelines
+│   └── ai/
+│       ├── master_prompt.md
+│       ├── coding_rules.md
+│       ├── architecture_rules.md
+│       ├── security_rules.md
+│       └── testing_rules.md
+│
+├── uploads/                   # Uploaded images (created at runtime)
+├── results/                   # Processed images (created at runtime)
+├── models/                    # AI models (downloaded automatically)
 ├── requirements.txt           # Python dependencies
-├── .env.example              # Example environment variables
-└── README.md                 # This file
+├── .env.example               # Environment variables template
+├── run.py                     # Startup script
+├── install_deps.py            # Automated dependency installer
+└── README.md
 ```
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
 - Python 3.11 or higher
-- pip
-- (Optional) Docker and Docker Compose
-- (Optional) Cloudflare R2 account for cloud storage
+- Node.js 18+ and npm
+- Redis (for queue processing)
+- (Optional) NVIDIA GPU with CUDA for AI upscaling
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/lavanya-2626/Image-morph.git
-   cd Image-morph
+   git clone https://github.com/yourusername/image-morph.git
+   cd image-morph
    ```
 
-2. **Create a virtual environment**
+2. **Set up Python virtual environment**
    ```bash
    python -m venv venv
    
@@ -99,116 +158,240 @@ image_morph/
    source venv/bin/activate
    ```
 
-3. **Install dependencies**
+3. **Install Python dependencies**
    ```bash
-   pip install -r requirements.txt
+   python -m pip install -r requirements.txt
    ```
 
-4. **Set up environment variables**
+4. **(Optional) Enable AI upscaling (Real-ESRGAN)**
+
+   Recommended Python for the AI stack: **3.11.x** (newer versions may force source builds and fail).
+
+   For automated installation:
+   ```bash
+   python install_deps.py
+   ```
+
+   For manual installation:
+   ```bash
+   # Install PyTorch first (CPU or CUDA version)
+   pip install torch torchvision
+
+   # Install BasicSR from GitHub (avoids version issues)
+   pip install "basicsr @ git+https://github.com/xinntao/BasicSR.git@master"
+
+   # Install AI upscaling packages
+   pip install realesrgan facexlib gfpgan filterpy
+   ```
+
+5. **Set up environment variables**
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
-5. **Run the application**
+6. **Start Redis** (for queue processing)
+   
+   **Docker (recommended):**
    ```bash
-   python -m backend.app
+   docker run -d -p 6379:6379 --name redis redis:alpine
    ```
-
-6. **Open in browser**
-   ```
-   http://localhost:8000
-   ```
-
-### Docker Deployment
-
-1. **Build and run with Docker Compose**
+   
+   **Windows:**
+   - Download Redis from: https://github.com/microsoftarchive/redis/releases
+   - Or use WSL: `sudo apt-get install redis-server && redis-server`
+   
+   **macOS/Linux:**
    ```bash
-   cd docker
-   docker-compose up --build
+   redis-server
    ```
 
-2. **With Nginx (production setup)**
+7. **Install frontend dependencies**
    ```bash
-   cd docker
-   docker-compose --profile with-nginx up --build
+   cd frontend
+   npm install
+   cd ..
    ```
 
-## 📖 API Documentation
+### Running the Application
 
-Once the server is running, you can access the interactive API documentation:
+#### Option 1: Start all services separately
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+**Terminal 1 - Backend:**
+```bash
+python run.py
+```
 
-### API Endpoints
+**Terminal 2 - Celery Worker:**
+```bash
+celery -A backend.celery_app worker --loglevel=info -Q upscale
+```
+
+**Terminal 3 - Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+
+#### Option 2: Use Docker Compose
+
+```bash
+cd docker
+docker-compose up --build
+```
+
+### Access the Application
+
+- **Frontend:** http://localhost:5173
+- **API:** http://localhost:8000
+- **API Docs (Swagger):** http://localhost:8000/docs
+- **API Docs (ReDoc):** http://localhost:8000/redoc
+
+## API Documentation
+
+### Conversion Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/upload` | Upload an image |
-| POST | `/api/convert` | Convert uploaded image |
+| POST | `/api/upload` | Upload a single image |
+| POST | `/api/upload/bulk` | Upload multiple images |
+| POST | `/api/convert` | Convert image to specified format |
 | GET | `/api/image/{id}` | Get converted image (preview) |
 | GET | `/api/download/{id}` | Download converted image |
 | GET | `/api/images` | List recent conversions |
-| DELETE | `/api/image/{id}` | Delete an image |
-| GET | `/api/info` | Get API information |
-| GET | `/health` | Health check |
+| DELETE | `/api/image/{id}` | Delete an image record |
 
-## ⚙️ Configuration
+### Upscaling Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/upscale/single` | Upload and upscale a single image |
+| POST | `/api/upscale/bulk` | Upload and upscale multiple images |
+| GET | `/api/upscale/status/{job_id}` | Get job status and progress |
+| GET | `/api/upscale/jobs` | List recent jobs |
+| GET | `/api/upscale/compare/{job_id}` | Get comparison data |
+| GET | `/api/upscale/download/original/{job_id}` | Download original image |
+| GET | `/api/upscale/download/result/{job_id}` | Download upscaled image |
+| DELETE | `/api/upscale/job/{job_id}` | Delete a job |
+| GET | `/api/upscale/system-status` | Get system status |
+
+### Example: Convert an Image
+
+```bash
+# Upload image
+curl -X POST "http://localhost:8000/api/upload" \
+  -F "file=@image.jpg"
+
+# Returns: { "id": "uuid", ... }
+
+# Convert to WebP
+curl -X POST "http://localhost:8000/api/convert" \
+  -F "id=uuid-from-upload" \
+  -F "format=webp" \
+  -F "quality=85"
+```
+
+### Example: Upscale an Image
+
+```bash
+curl -X POST "http://localhost:8000/api/upscale/single" \
+  -H "accept: application/json" \
+  -F "file=@image.jpg" \
+  -F "scale=4"
+```
+
+Response:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "task_id": "abc123",
+  "status": "pending",
+  "message": "Upscaling job queued successfully"
+}
+```
+
+## Configuration
 
 ### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | Database connection string | `sqlite:///./image_morph.db` |
-| `R2_ENDPOINT_URL` | Cloudflare R2 endpoint | - |
-| `R2_ACCESS_KEY_ID` | R2 access key | - |
-| `R2_SECRET_ACCESS_KEY` | R2 secret key | - |
-| `R2_BUCKET_NAME` | R2 bucket name | `image-morph` |
-| `R2_PUBLIC_URL` | Public URL for R2 files | - |
+| `DATABASE_URL` | SQLite database path | `sqlite:///./image_morph.db` |
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379/0` |
 | `APP_HOST` | Server host | `0.0.0.0` |
 | `APP_PORT` | Server port | `8000` |
-| `MAX_FILE_SIZE` | Max upload size (bytes) | `10485760` (10MB) |
-| `SECRET_KEY` | Secret key for security | - |
+| `MAX_FILE_SIZE` | Max upload size (bytes) | `52428800` (50MB) |
+| `MODELS_DIR` | Directory for AI models | `./models` |
+| `RESULTS_DIR` | Directory for processed images | `./results` |
+| `UPLOADS_DIR` | Directory for uploaded images | `./uploads` |
+| `R2_*` | Cloudflare R2 credentials | (optional) |
 
-### Cloudflare R2 Setup (Optional)
+### GPU Acceleration
 
-1. Create a Cloudflare R2 bucket
-2. Generate API tokens with read/write permissions
-3. Add the credentials to your `.env` file
+The application automatically detects and uses CUDA if available. To check GPU status:
 
-## 🖼️ Supported Formats
+```bash
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+```
 
-### Input Formats
-- JPG/JPEG
-- PNG
-- WebP
-- BMP
-- TIFF
+## Docker Deployment
 
-### Output Formats
-- **WebP** - Best for web, smaller file sizes
-- **SVG** - Scalable vector graphics
-- **PNG** - Lossless compression
-- **JPEG** - Universal compatibility
+### Using Docker Compose
 
-## 🔒 Security
+```bash
+cd docker
+docker-compose up --build
+```
+
+### Services
+
+- **API**: FastAPI backend
+- **Worker**: Celery worker for processing
+- **Redis**: Message broker
+- **Frontend**: React dev server (or nginx for production)
+
+## Notes
+
+### Supported Formats
+
+**Input:** JPEG, PNG, WebP, BMP, SVG  
+**Output:** JPEG, PNG, WebP, SVG
+
+### Performance
+
+**Image Conversion:**
+- Instant for most formats
+- ~1-5 seconds for large files
+
+**AI Upscaling (if enabled):**
+- **CPU**: ~30-60 seconds per image (depending on size)
+- **GPU (CUDA)**: ~5-15 seconds per image
+- **Max input dimension**: 4096px (configurable)
+
+### First Run (AI Upscaling)
+
+On the first run with AI upscaling enabled, RealESRGAN models will be automatically downloaded (~60MB for 2x, ~64MB for 4x). This may take a few minutes depending on your internet connection.
+
+## Security
 
 - File type validation
 - File size limits
 - CORS protection
 - Input sanitization
+- Secure file storage
 
-## 🛣️ Roadmap
+## Roadmap
 
-- [ ] Batch image conversion
-- [ ] Image resizing options
-- [ ] Compression quality slider
-- [ ] User authentication
-- [ ] Conversion analytics dashboard
-- [ ] Queue processing with Celery/Redis
+- [ ] User authentication and accounts
+- [ ] Advanced upscaling options (denoise, face enhance)
+- [ ] Custom model selection
+- [ ] Batch download as ZIP
+- [ ] Webhook notifications
+- [ ] Progressive Web App (PWA)
+- [ ] Dark/Light theme toggle
+- [ ] Image watermarking
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -218,17 +401,18 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- [Pillow](https://python-pillow.org/) - Python Imaging Library
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern web framework
-- [CairoSVG](https://cairosvg.org/) - SVG converter
-- [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/) - Object storage
+- [RealESRGAN](https://github.com/xinntao/Real-ESRGAN) - AI upscaling models
+- [FastAPI](https://fastapi.tiangolo.com/) - Web framework
+- [Celery](https://docs.celeryq.dev/) - Distributed task queue
+- [React](https://react.dev/) - Frontend library
+- [Pillow](https://python-pillow.org/) - Image processing
 
 ---
 
-Made with ❤️ for web developers and designers
+Made with love using FastAPI and React

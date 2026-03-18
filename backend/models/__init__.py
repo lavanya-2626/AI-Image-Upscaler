@@ -1,3 +1,17 @@
-from backend.models.image_model import ImageRecord
+"""Database Models for Image Morph."""
 
-__all__ = ["ImageRecord"]
+from .image_model import (
+    Base,
+    ImageRecord,
+    UpscaleJob,
+    ProcessedImage,
+    UpscaleStatus,
+)
+
+__all__ = [
+    "Base",
+    "ImageRecord",
+    "UpscaleJob",
+    "ProcessedImage",
+    "UpscaleStatus",
+]

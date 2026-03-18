@@ -1,7 +1,7 @@
 """
-Image Morph - FastAPI Backend Application
+Image Upscaler - FastAPI Backend Application
 
-A web-based image conversion platform supporting WebP and SVG formats.
+AI-powered image upscaling using RealESRGAN with queue processing.
 """
 
 import os
@@ -22,7 +22,7 @@ import logging
 
 from backend.config import settings
 from backend.database import engine, Base
-from backend.routes.convert import router as convert_router
+from backend.routes.upscale import router as upscale_router
 
 # Configure logging
 logging.basicConfig(
@@ -36,7 +36,16 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    logger.info("Starting up Image Morph API...")
+    logger.info("Starting up Image Upscaler API...")
+    
+    # Create upload and results directories
+    upload_dir = project_root / "uploads"
+    results_dir = project_root / "results"
+    models_dir = project_root / "models"
+    
+    for dir_path in [upload_dir, results_dir, models_dir]:
+        dir_path.mkdir(exist_ok=True)
+        logger.info(f"Directory ready: {dir_path}")
     
     # Create database tables
     Base.metadata.create_all(bind=engine)
@@ -45,14 +54,14 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("Shutting down Image Morph API...")
+    logger.info("Shutting down Image Upscaler API...")
 
 
 # Create FastAPI application
 app = FastAPI(
-    title="Image Morph API",
-    description="Web-based image conversion platform supporting WebP and SVG formats",
-    version="1.0.0",
+    title="Image Upscaler API",
+    description="AI-powered image upscaling using RealESRGAN with 2x and 4x options",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -69,36 +78,122 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(convert_router)
+app.include_router(upscale_router)
 
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Root endpoint - serve the frontend."""
-    frontend_path = project_root / "frontend" / "index.html"
-    if frontend_path.exists():
-        with open(frontend_path, "r", encoding="utf-8") as f:
+    # Check if React build exists
+    react_build_path = project_root / "frontend" / "dist" / "index.html"
+    if react_build_path.exists():
+        with open(react_build_path, "r", encoding="utf-8") as f:
             return f.read()
+    
+    # Fallback API landing page
     return HTMLResponse(content="""
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Image Morph API</title>
+        <title>Image Upscaler API</title>
         <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
-            h1 { color: #333; }
-            a { color: #007bff; text-decoration: none; }
-            a:hover { text-decoration: underline; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #fff;
+            }
+            .container { 
+                max-width: 800px; 
+                padding: 40px; 
+                text-align: center;
+            }
+            h1 { 
+                font-size: 3em; 
+                margin-bottom: 10px;
+                background: linear-gradient(45deg, #00d4ff, #7b2cbf);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+            .subtitle {
+                font-size: 1.2em;
+                color: #888;
+                margin-bottom: 40px;
+            }
+            .features {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 20px;
+                margin: 40px 0;
+            }
+            .feature {
+                background: rgba(255,255,255,0.05);
+                padding: 20px;
+                border-radius: 10px;
+                border: 1px solid rgba(255,255,255,0.1);
+            }
+            .feature h3 {
+                color: #00d4ff;
+                margin-bottom: 10px;
+            }
+            .links {
+                margin-top: 40px;
+            }
+            .links a { 
+                display: inline-block;
+                color: #fff;
+                text-decoration: none;
+                padding: 12px 30px;
+                margin: 10px;
+                border-radius: 25px;
+                background: linear-gradient(45deg, #00d4ff, #7b2cbf);
+                transition: transform 0.2s;
+            }
+            .links a:hover {
+                transform: translateY(-2px);
+            }
+            .status {
+                margin-top: 30px;
+                padding: 15px;
+                background: rgba(0,212,255,0.1);
+                border-radius: 10px;
+                border: 1px solid rgba(0,212,255,0.3);
+            }
         </style>
     </head>
     <body>
-        <h1>🖼️ Image Morph API</h1>
-        <p>Welcome to the Image Morph API server.</p>
-        <p>
-            <a href="/docs">📚 API Documentation (Swagger UI)</a> |
-            <a href="/redoc">📖 API Documentation (ReDoc)</a>
-        </p>
-        <p>The frontend should be available at <code>/frontend/index.html</code></p>
+        <div class="container">
+            <h1>✨ Image Upscaler API</h1>
+            <p class="subtitle">AI-powered image enhancement with RealESRGAN</p>
+            
+            <div class="features">
+                <div class="feature">
+                    <h3>🎯 2x & 4x Upscaling</h3>
+                    <p>Choose your desired enhancement level</p>
+                </div>
+                <div class="feature">
+                    <h3>⚡ Queue Processing</h3>
+                    <p>Celery-powered background tasks</p>
+                </div>
+                <div class="feature">
+                    <h3>📦 Bulk Support</h3>
+                    <p>Process multiple images at once</p>
+                </div>
+            </div>
+            
+            <div class="links">
+                <a href="/docs">📚 API Docs (Swagger)</a>
+                <a href="/redoc">📖 API Docs (ReDoc)</a>
+            </div>
+            
+            <div class="status">
+                🟢 API Server Running | Version 2.0.0
+            </div>
+        </div>
     </body>
     </html>
     """)
@@ -107,37 +202,55 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
+    import torch
+    
+    # Check Celery connection
+    try:
+        from backend.celery_app import celery_app
+        inspector = celery_app.control.inspect()
+        active_workers = inspector.active()
+        celery_status = "connected" if active_workers is not None else "no workers"
+    except Exception as e:
+        celery_status = f"error: {str(e)}"
+    
     return {
         "status": "healthy",
-        "service": "image-morph-api",
-        "version": "1.0.0"
+        "service": "image-upscaler-api",
+        "version": "2.0.0",
+        "gpu_available": torch.cuda.is_available(),
+        "celery_status": celery_status
     }
 
 
 @app.get("/api/info")
 async def api_info():
-    """Get API information and supported formats."""
-    from backend.services.image_converter import ImageConverter
-    
+    """Get API information and supported features."""
     return {
-        "name": "Image Morph API",
-        "version": "1.0.0",
-        "supported_input_formats": list(ImageConverter.ALLOWED_INPUT_FORMATS),
-        "supported_output_formats": list(ImageConverter.ALLOWED_OUTPUT_FORMATS),
-        "max_file_size": settings.MAX_FILE_SIZE,
+        "name": "Image Upscaler API",
+        "version": "2.0.0",
         "features": [
-            "JPG/JPEG/PNG to WebP conversion",
-            "JPG/JPEG/PNG to SVG conversion",
-            "Image optimization",
-            "Cloud storage support (Cloudflare R2)"
-        ]
+            "AI-powered image upscaling (RealESRGAN)",
+            "2x and 4x upscaling options",
+            "Single image processing",
+            "Bulk image processing",
+            "Before/after comparison",
+            "Queue-based processing (Celery)",
+            "Progress tracking",
+            "HD image download"
+        ],
+        "supported_formats": {
+            "input": ["JPEG", "PNG", "WebP", "BMP"],
+            "output": ["Same as input"]
+        },
+        "max_file_size": settings.MAX_FILE_SIZE,
+        "max_bulk_files": 20
     }
 
 
 # Mount static files for frontend
-frontend_dir = project_root / "frontend"
-if frontend_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
+frontend_dist = project_root / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
 
 
 if __name__ == "__main__":
