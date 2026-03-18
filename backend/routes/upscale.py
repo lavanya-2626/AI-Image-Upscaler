@@ -104,6 +104,7 @@ async def upload_and_upscale_single(
         db.close()
     
     # Queue Celery task (or process synchronously if Celery is not available)
+    is_sync = False
     try:
         task = upscale_single.delay(
             image_path=str(upload_path),
@@ -112,6 +113,7 @@ async def upload_and_upscale_single(
         )
         task_id = task.id
         message = "Upscaling job queued successfully"
+        response_status = "pending"
     except Exception as e:
         logger.warning(f"Celery not available ({e}), processing synchronously")
         # Process synchronously if Celery is not available
@@ -120,6 +122,8 @@ async def upload_and_upscale_single(
             result = process_image_core(str(upload_path), scale, job_id)
             task_id = "sync-" + job_id
             message = "Upscaling completed (synchronous mode)"
+            is_sync = True
+            response_status = "completed"
         except Exception as sync_error:
             logger.error(f"Synchronous processing failed: {sync_error}")
             raise HTTPException(status_code=500, detail=f"Processing failed: {sync_error}")
@@ -137,7 +141,7 @@ async def upload_and_upscale_single(
     return CreateJobResponse(
         job_id=job_id,
         task_id=task_id,
-        status="pending",
+        status=response_status,
         message=message
     )
 
@@ -260,8 +264,19 @@ async def get_job_status(job_id: str):
             created_at=job.created_at.isoformat() if job.created_at else None
         )
         
-        # Get Celery task status for progress
-        if job.celery_task_id:
+        # Get result from database if job is completed
+        if job.status == "completed" and job.result_path:
+            # Build result from database
+            response.result = UpscaleResult(
+                success=True,
+                input_path=job.original_path,
+                output_path=job.result_path,
+                original_size=(job.original_width, job.original_height) if job.original_width else None,
+                upscaled_size=(job.upscaled_width, job.upscaled_height) if job.upscaled_width else None
+            )
+        
+        # Get Celery task status for progress (only for async tasks)
+        if job.celery_task_id and not job.celery_task_id.startswith("sync-"):
             task_info = get_task_status(job.celery_task_id)
             
             if task_info.get("status") == "PROGRESS":
@@ -276,12 +291,18 @@ async def get_job_status(job_id: str):
                         input_path=result.get("input_path"),
                         output_path=result.get("output_path"),
                         original_size=result.get("original_size"),
-                        upcaled_size=result.get("upscaled_size")
+                        upscaled_size=result.get("upscaled_size")
                     )
                 elif job.job_type == "bulk":
                     response.results = [
                         UpscaleResult(**r) for r in result.get("results", [])
                     ]
+        # For synchronous tasks, mark as 100% complete if done
+        elif job.celery_task_id and job.celery_task_id.startswith("sync-"):
+            if job.status == "completed":
+                response.progress = 100
+            elif job.status == "processing":
+                response.progress = 50
         
         return response
         
