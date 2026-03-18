@@ -149,6 +149,7 @@ image-morph/
 
 2. **Set up Python virtual environment**
    ```bash
+   cd backend
    python -m venv venv
    
    # On Windows
@@ -160,7 +161,8 @@ image-morph/
 
 3. **Install Python dependencies**
    ```bash
-   python -m pip install -r requirements.txt
+   # From backend directory with venv activated
+   python -m pip install -r ../requirements.txt
    ```
 
 4. **(Optional) Enable AI upscaling (Real-ESRGAN)**

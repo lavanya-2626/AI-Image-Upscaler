@@ -23,6 +23,7 @@ import logging
 from backend.config import settings
 from backend.database import engine, Base
 from backend.routes.upscale import router as upscale_router
+from backend.routes.convert import router as convert_router
 
 # Configure logging
 logging.basicConfig(
@@ -79,6 +80,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(upscale_router)
+app.include_router(convert_router)
 
 
 @app.get("/", response_class=HTMLResponse)
