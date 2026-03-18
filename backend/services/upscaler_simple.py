@@ -101,6 +101,9 @@ class SimpleUpscaler:
 BasicUpscaler = SimpleUpscaler
 
 
-def get_upscaler():
+def get_upscaler(models_dir: str = None):
     """Get upscaler instance (always returns SimpleUpscaler)."""
-    return SimpleUpscaler()
+    # Use absolute path for models directory
+    if models_dir is None:
+        models_dir = Path(__file__).parent.parent.parent / "models"
+    return SimpleUpscaler(models_dir=str(models_dir))

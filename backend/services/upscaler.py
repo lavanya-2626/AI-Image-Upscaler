@@ -229,11 +229,15 @@ class BasicUpscaler:
 
 
 # Factory function to get upscaler instance
-def get_upscaler():
+def get_upscaler(models_dir: str = None):
     """Get best available upscaler instance."""
+    # Use absolute path for models directory
+    if models_dir is None:
+        models_dir = Path(__file__).parent.parent.parent / "models"
+    
     try:
         if TORCH_AVAILABLE and REALESRGAN_AVAILABLE:
-            return RealESRGANUpscaler()
+            return RealESRGANUpscaler(models_dir=str(models_dir))
         else:
             raise ImportError("RealESRGAN dependencies not available")
     except Exception as e:

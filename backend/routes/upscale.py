@@ -27,10 +27,11 @@ from backend.services.upscaler import get_upscaler
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/upscale", tags=["upscale"])
 
-# Directories
-UPLOAD_DIR = Path("uploads")
+# Directories - use absolute paths from project root
+project_root = Path(__file__).parent.parent.parent
+UPLOAD_DIR = project_root / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
-RESULT_DIR = Path("results")
+RESULT_DIR = project_root / "results"
 RESULT_DIR.mkdir(exist_ok=True)
 
 

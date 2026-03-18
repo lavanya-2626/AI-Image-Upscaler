@@ -14,11 +14,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Upload directory
-UPLOAD_DIR = Path("uploads")
+# Upload directory - use absolute paths from project root
+project_root = Path(__file__).parent.parent.parent
+UPLOAD_DIR = project_root / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-RESULT_DIR = Path("results")
+RESULT_DIR = project_root / "results"
 RESULT_DIR.mkdir(exist_ok=True)
 
 
