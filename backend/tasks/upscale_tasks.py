@@ -57,36 +57,34 @@ def update_db_job_status(job_id: Optional[str], status: str, **kwargs):
         logger.error(f"Failed to update job status: {e}")
 
 
-@shared_task(bind=True, max_retries=3)
-def upscale_single(self, image_path: str, scale: int = 2, job_id: Optional[str] = None) -> Dict:
+def process_image_core(image_path: str, scale: int = 2, job_id: Optional[str] = None, progress_callback=None) -> Dict:
     """
-    Upscale a single image.
+    Core image processing logic (can be called directly or from Celery).
     
     Args:
         image_path: Path to the image file
         scale: Upscaling factor (2 or 4)
         job_id: Optional job ID for tracking
+        progress_callback: Optional callback function for progress updates
     
     Returns:
         Dictionary with upscaling results
     """
     start_time = time.time()
     
+    def update_progress(progress, status):
+        if progress_callback:
+            progress_callback(progress, status)
+    
     try:
         # Update progress
-        self.update_state(
-            state="PROGRESS",
-            meta={"progress": 10, "status": "Loading upscaler..."}
-        )
+        update_progress(10, "Loading upscaler...")
         
         # Get upscaler instance
         upscaler = get_upscaler()
         
         # Validate image
-        self.update_state(
-            state="PROGRESS",
-            meta={"progress": 20, "status": "Validating image..."}
-        )
+        update_progress(20, "Validating image...")
         
         if not upscaler.validate_image(image_path):
             raise ValueError("Invalid image file")
@@ -95,10 +93,7 @@ def upscale_single(self, image_path: str, scale: int = 2, job_id: Optional[str] 
         update_db_job_status(job_id, "processing")
         
         # Perform upscaling
-        self.update_state(
-            state="PROGRESS",
-            meta={"progress": 30, "status": "Upscaling image with RealESRGAN..."}
-        )
+        update_progress(30, "Upscaling image...")
         
         output_filename = f"{Path(image_path).stem}_x{scale}{Path(image_path).suffix}"
         output_path = str(RESULT_DIR / output_filename)
@@ -109,10 +104,7 @@ def upscale_single(self, image_path: str, scale: int = 2, job_id: Optional[str] 
             output_path=output_path
         )
         
-        self.update_state(
-            state="PROGRESS",
-            meta={"progress": 90, "status": "Finalizing..."}
-        )
+        update_progress(90, "Finalizing...")
         
         # Calculate processing time
         processing_time = time.time() - start_time
@@ -129,10 +121,7 @@ def upscale_single(self, image_path: str, scale: int = 2, job_id: Optional[str] 
             upscaled_height=upscaled_size[1]
         )
         
-        self.update_state(
-            state="SUCCESS",
-            meta={"progress": 100, "status": "Completed"}
-        )
+        update_progress(100, "Completed")
         
         # Determine model type
         from backend.services.upscaler import RealESRGANUpscaler
@@ -149,9 +138,37 @@ def upscale_single(self, image_path: str, scale: int = 2, job_id: Optional[str] 
             "model": model_type
         }
             
+    except Exception as e:
+        logger.error(f"Processing failed for {image_path}: {e}")
+        update_db_job_status(job_id, "failed", error_message=str(e))
+        raise
+
+
+@shared_task(bind=True, max_retries=3)
+def upscale_single(self, image_path: str, scale: int = 2, job_id: Optional[str] = None) -> Dict:
+    """
+    Celery task to upscale a single image.
+    
+    Args:
+        image_path: Path to the image file
+        scale: Upscaling factor (2 or 4)
+        job_id: Optional job ID for tracking
+    
+    Returns:
+        Dictionary with upscaling results
+    """
+    def celery_progress(progress, status):
+        self.update_state(
+            state="PROGRESS",
+            meta={"progress": progress, "status": status}
+        )
+    
+    try:
+        return process_image_core(image_path, scale, job_id, celery_progress)
     except SoftTimeLimitExceeded:
         logger.error(f"Task timed out for {image_path}")
         update_db_job_status(job_id, "failed", error_message="Processing timeout")
+        raise
         raise
         
     except Exception as exc:

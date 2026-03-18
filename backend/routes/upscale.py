@@ -103,28 +103,42 @@ async def upload_and_upscale_single(
     finally:
         db.close()
     
-    # Queue Celery task
-    task = upscale_single.delay(
-        image_path=str(upload_path),
-        scale=scale,
-        job_id=job_id
-    )
+    # Queue Celery task (or process synchronously if Celery is not available)
+    try:
+        task = upscale_single.delay(
+            image_path=str(upload_path),
+            scale=scale,
+            job_id=job_id
+        )
+        task_id = task.id
+        message = "Upscaling job queued successfully"
+    except Exception as e:
+        logger.warning(f"Celery not available ({e}), processing synchronously")
+        # Process synchronously if Celery is not available
+        try:
+            from backend.tasks.upscale_tasks import process_image_core
+            result = process_image_core(str(upload_path), scale, job_id)
+            task_id = "sync-" + job_id
+            message = "Upscaling completed (synchronous mode)"
+        except Exception as sync_error:
+            logger.error(f"Synchronous processing failed: {sync_error}")
+            raise HTTPException(status_code=500, detail=f"Processing failed: {sync_error}")
     
     # Update job with task ID
     db = get_db()
     try:
         job = db.query(UpscaleJob).filter(UpscaleJob.id == job_id).first()
         if job:
-            job.celery_task_id = task.id
+            job.celery_task_id = task_id
             db.commit()
     finally:
         db.close()
     
     return CreateJobResponse(
         job_id=job_id,
-        task_id=task.id,
+        task_id=task_id,
         status="pending",
-        message="Upscaling job queued successfully"
+        message=message
     )
 
 
