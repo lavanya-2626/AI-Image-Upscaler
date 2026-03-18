@@ -382,8 +382,8 @@ async def compare_images(job_id: str):
         from backend.schemas.upscale import ImageDimensions
         
         return CompareResponse(
-            original_url=f"/api/upscale/download/original/{job_id}",
-            upscaled_url=f"/api/upscale/download/result/{job_id}",
+            original_url=f"/api/upscale/preview/original/{job_id}",
+            upscaled_url=f"/api/upscale/preview/result/{job_id}",
             original_dimensions=ImageDimensions(
                 width=job.original_width,
                 height=job.original_height
@@ -444,6 +444,57 @@ async def download_result(job_id: str):
             path=str(file_path),
             filename=file_path.name,
             media_type="image/*"
+        )
+        
+    finally:
+        db.close()
+
+
+@router.get("/preview/original/{job_id}")
+async def preview_original(job_id: str):
+    """Preview the original uploaded image (for display in browser)."""
+    db = get_db()
+    try:
+        job = db.query(UpscaleJob).filter(UpscaleJob.id == job_id).first()
+        if not job or not job.original_path:
+            raise HTTPException(status_code=404, detail="Original file not found")
+        
+        file_path = Path(job.original_path)
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File not found on disk")
+        
+        # Return with inline disposition for browser display
+        return FileResponse(
+            path=str(file_path),
+            media_type=f"image/{file_path.suffix.lstrip('.').lower() if file_path.suffix else 'jpeg'}",
+            headers={"Content-Disposition": f"inline; filename={file_path.name}"}
+        )
+        
+    finally:
+        db.close()
+
+
+@router.get("/preview/result/{job_id}")
+async def preview_result(job_id: str):
+    """Preview the upscaled image (for display in browser)."""
+    db = get_db()
+    try:
+        job = db.query(UpscaleJob).filter(UpscaleJob.id == job_id).first()
+        if not job or not job.result_path:
+            raise HTTPException(status_code=404, detail="Result file not found")
+        
+        if job.status != UpscaleStatus.COMPLETED:
+            raise HTTPException(status_code=400, detail="Upscaling not completed yet")
+        
+        file_path = Path(job.result_path)
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Result file not found on disk")
+        
+        # Return with inline disposition for browser display
+        return FileResponse(
+            path=str(file_path),
+            media_type=f"image/{file_path.suffix.lstrip('.').lower() if file_path.suffix else 'jpeg'}",
+            headers={"Content-Disposition": f"inline; filename={file_path.name}"}
         )
         
     finally:
